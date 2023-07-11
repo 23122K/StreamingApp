@@ -24,6 +24,7 @@ public final class CameraManager {
     //MARK: - Dependencies
     public let captureSession = AVCaptureSession()
     private let videoDataOutput = AVCaptureVideoDataOutput()
+    private let audioDataOutput = AVCaptureAudioDataOutput()
     
     private var videoInput: AVCaptureDeviceInput!
     private var audioInput: AVCaptureDeviceInput!
@@ -31,6 +32,7 @@ public final class CameraManager {
     //MARK: - Dispatch Queues
     private var captureSessionQueue = DispatchQueue(label: "capture.session")
     private var videoDataOutputQueue = DispatchQueue(label: "video.data.output")
+    private var audioDataOutputQueue = DispatchQueue(label: "audio.data.output")
     
     private func configureCaptureSession() {
         captureSessionQueue.async { [self] in
@@ -104,7 +106,6 @@ public final class CameraManager {
         audioInput = try? AVCaptureDeviceInput(device: device)
         guard let audioInput = audioInput, captureSession.canAddInput(audioInput) else {
             captureSessionStatus = .failed
-            print("here is fails")
             return
         }
         
@@ -140,6 +141,14 @@ public final class CameraManager {
     
     private init() {
         configureCaptureSession()
+    }
+    
+    func setVideoDataOutputDelegate(with delegate: AVCaptureVideoDataOutputSampleBufferDelegate) {
+        videoDataOutput.setSampleBufferDelegate(delegate, queue: videoDataOutputQueue)
+    }
+    
+    func setAudioDataOutputDelegate(with delegate: AVCaptureAudioDataOutputSampleBufferDelegate) {
+        audioDataOutput.setSampleBufferDelegate(delegate, queue: audioDataOutputQueue)
     }
     
     
