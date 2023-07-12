@@ -14,9 +14,8 @@ class VideoEncoder: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     private var compressionSession: VTCompressionSession!
     
     private static let naluStartCode = Data([UInt8](arrayLiteral: 0x00, 0x00, 0x00, 0x01))
-    private var naluHandler: ((Data) -> Void)?
-    
-    
+    public var naluHandler: ((Data) -> Void)?
+        
     private func extractSPSAndPPS(from sampleBuffer: CMSampleBuffer) {
         guard let description = CMSampleBufferGetFormatDescription(sampleBuffer) else { return }
         var parameterSetCount = 0
@@ -58,7 +57,9 @@ class VideoEncoder: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         
         guard let sps = sps, let pps = pps else { return }
         
+        print(#function)
         [Data(bytes: sps, count: spsSize), Data(bytes: pps, count: ppsSize)].forEach {
+            print("$0 is \($0)")
             naluHandler?(VideoEncoder.naluStartCode + $0)
         }
     }
@@ -171,7 +172,6 @@ class VideoEncoder: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     
     override init() {
         super.init()
-        configureCompressionSession()
     }
     
 }

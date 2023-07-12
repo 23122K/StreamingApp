@@ -15,6 +15,8 @@
 		6F0A70532A5C1BE8001D5F2A /* CameraPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F0A70522A5C1BE8001D5F2A /* CameraPreviewView.swift */; };
 		6F0A70552A5C2239001D5F2A /* VideoEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F0A70542A5C2239001D5F2A /* VideoEncoder.swift */; };
 		6F0A70582A5D5604001D5F2A /* CMSampleBuffer+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F0A70572A5D5604001D5F2A /* CMSampleBuffer+Extensions.swift */; };
+		6FB8F68D2A5D9A4000EC72B9 /* TCPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB8F68C2A5D9A4000EC72B9 /* TCPClient.swift */; };
+		6FB8F6CB2A5EC9F800EC72B9 /* AudioEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB8F6CA2A5EC9F800EC72B9 /* AudioEncoder.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +29,8 @@
 		6F0A70522A5C1BE8001D5F2A /* CameraPreviewView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CameraPreviewView.swift; sourceTree = "<group>"; };
 		6F0A70542A5C2239001D5F2A /* VideoEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoEncoder.swift; sourceTree = "<group>"; };
 		6F0A70572A5D5604001D5F2A /* CMSampleBuffer+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMSampleBuffer+Extensions.swift"; sourceTree = "<group>"; };
+		6FB8F68C2A5D9A4000EC72B9 /* TCPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TCPClient.swift; sourceTree = "<group>"; };
+		6FB8F6CA2A5EC9F800EC72B9 /* AudioEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEncoder.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,7 +85,9 @@
 			isa = PBXGroup;
 			children = (
 				6F0A70502A5C10F7001D5F2A /* CameraManager.swift */,
+				6FB8F6CA2A5EC9F800EC72B9 /* AudioEncoder.swift */,
 				6F0A70542A5C2239001D5F2A /* VideoEncoder.swift */,
+				6FB8F68C2A5D9A4000EC72B9 /* TCPClient.swift */,
 				6F0A70522A5C1BE8001D5F2A /* CameraPreviewView.swift */,
 			);
 			path = Utilities;
@@ -165,12 +171,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6FB8F68D2A5D9A4000EC72B9 /* TCPClient.swift in Sources */,
 				6F0A70532A5C1BE8001D5F2A /* CameraPreviewView.swift in Sources */,
 				6F0A70552A5C2239001D5F2A /* VideoEncoder.swift in Sources */,
 				6F0A70442A5C0FB5001D5F2A /* ContentView.swift in Sources */,
 				6F0A70512A5C10F7001D5F2A /* CameraManager.swift in Sources */,
 				6F0A70422A5C0FB5001D5F2A /* StreamingAppApp.swift in Sources */,
 				6F0A70582A5D5604001D5F2A /* CMSampleBuffer+Extensions.swift in Sources */,
+				6FB8F6CB2A5EC9F800EC72B9 /* AudioEncoder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
