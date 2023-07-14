@@ -10,18 +10,73 @@
 import AVFoundation
 import VideoToolbox
 
+protocol VideoEncoderOutputDelegate {
+    //Returns encoded CMSampleBuffer as NAL Unit
+    func encodedDataOuput(_ data: Data)
+}
+
 class VideoEncoder: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+    private let naluStartCode = Data([0x00, 0x00, 0x00, 0x01])
+    var encodedDataDelegate: VideoEncoderOutputDelegate?
     private var compressionSession: VTCompressionSession!
     
-    private static let naluStartCode = Data([UInt8](arrayLiteral: 0x00, 0x00, 0x00, 0x01))
-    public var naluHandler: ((Data) -> Void)?
+    private func isIframe(_ sbuf: CMSampleBuffer) -> Bool {
+        let attachments = CMSampleBufferGetSampleAttachmentsArray(sbuf, createIfNecessary: true) as? [[CFString: Any]]
         
-    private func extractSPSAndPPS(from sampleBuffer: CMSampleBuffer) {
-        guard let description = CMSampleBufferGetFormatDescription(sampleBuffer) else { return }
+        /*
+         I-Frame's are synchronous, so we might encounter two scenarios when parsing CMSampleBufferGetSampleAttachmentsArray
+         1.Key exist and has a value of:
+            true    => Not an I-Frame
+            false   => I-Frame
+         2.Key does not exist => I-Frame
+        */
+        
+        let keyExists = (attachments?.first?[kCMSampleAttachmentKey_NotSync] as? Bool) ?? false
+        
+        return !keyExists
+    }
+    
+    private func extractDataFromCMBlockBuffer(bbuf: CMBlockBuffer) {
+        var bufferLength: Int = 0
+        var bufferDataPtr: UnsafeMutablePointer<Int8>?
+        
+        let error = CMBlockBufferGetDataPointer(
+            bbuf,
+            atOffset: 0,
+            lengthAtOffsetOut: nil,
+            totalLengthOut: &bufferLength,
+            dataPointerOut: &bufferDataPtr
+        )
+        
+        guard error == kCMBlockBufferNoErr, let bufferDataPtr = bufferDataPtr else { return }
+        
+        var bufferOffset: Int = 0
+        let AVCCHeaderLength: Int = 4
+        
+        while bufferOffset < (bufferLength - AVCCHeaderLength) {
+            var NALUnitLength: UInt32 = 0
+            memcpy(&NALUnitLength, (bufferDataPtr + bufferOffset), AVCCHeaderLength)
+            NALUnitLength = CFSwapInt32BigToHost(NALUnitLength)
+            
+            
+            let data = Data(bytes: bufferDataPtr + bufferOffset + AVCCHeaderLength, count: Int(bufferLength))
+            
+            print("Sending Visal Data")
+            encodedDataDelegate?.encodedDataOuput(naluStartCode + data)
+            
+            bufferOffset += AVCCHeaderLength + Int(NALUnitLength)
+            
+        }
+    }
+    
+    ///Extracts Sequence Parameter Set and Picture Parameter set from CMSampleBuffer
+    private func extractSPSAndPPS(_ sbuf: CMSampleBuffer) {
+        //SPS and PPS is located in format description
+        guard let formatDescriptoin = CMSampleBufferGetFormatDescription(sbuf) else { return }
         var parameterSetCount = 0
         
         CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
-            description,
+            formatDescriptoin,
             parameterSetIndex: 0,
             parameterSetPointerOut: nil,
             parameterSetSizeOut: nil,
@@ -29,45 +84,48 @@ class VideoEncoder: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
             nalUnitHeaderLengthOut: nil
         )
         
-        guard parameterSetCount == 2 else { return }
+        //The number of parameterSetCount to include in the format description must be at least 2.
+        guard parameterSetCount >= 2 else { return }
         
+        //Sequence Parameter Set
         var spsSize: Int = 0
-        var sps: UnsafePointer<UInt8>?
+        var spsPtr: UnsafePointer<UInt8>?
         
+        //Picture Parameter Set
+        var ppsSize: Int = 0
+        var ppsPtr: UnsafePointer<UInt8>?
+        
+        //Extracting sps data
         CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
-            description,
+            formatDescriptoin,
             parameterSetIndex: 0,
-            parameterSetPointerOut: &sps,
+            parameterSetPointerOut: &spsPtr,
             parameterSetSizeOut: &spsSize,
             parameterSetCountOut: nil,
             nalUnitHeaderLengthOut: nil
         )
         
-        var ppsSize: Int = 0
-        var pps: UnsafePointer<UInt8>?
-        
+        //Extracting pps data
         CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
-            description,
+            formatDescriptoin,
             parameterSetIndex: 1,
-            parameterSetPointerOut: &pps,
+            parameterSetPointerOut: &ppsPtr,
             parameterSetSizeOut: &ppsSize,
             parameterSetCountOut: nil,
             nalUnitHeaderLengthOut: nil
         )
         
-        guard let sps = sps, let pps = pps else { return }
+        guard let spsPtr = spsPtr, let ppsPtr = ppsPtr else { return }
         
-        print(#function)
-        [Data(bytes: sps, count: spsSize), Data(bytes: pps, count: ppsSize)].forEach {
-            print("$0 is \($0)")
-            naluHandler?(VideoEncoder.naluStartCode + $0)
-        }
+        print("Sending -> SPS")
+        encodedDataDelegate?.encodedDataOuput(naluStartCode + Data(bytes: spsPtr, count: spsSize))
+        print("Sending -> PPS")
+        encodedDataDelegate?.encodedDataOuput(naluStartCode + Data(bytes: ppsPtr, count: ppsSize))
     }
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         encode(sbuf: sampleBuffer)
     }
-    
     
     private func encode(sbuf buffer: CMSampleBuffer) {
         guard let compressionSession = compressionSession, let imageBuffer = CMSampleBufferGetImageBuffer(buffer) else { return }
@@ -95,51 +153,18 @@ class VideoEncoder: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         
         let encoder: VideoEncoder = Unmanaged<VideoEncoder>.fromOpaque(outputCallbackRefCon).takeUnretainedValue()
         
-        if sampleBuffer.isIFrame {
-            encoder.extractSPSAndPPS(from: sampleBuffer)
+        if encoder.isIframe(sampleBuffer) {
+            encoder.extractSPSAndPPS(sampleBuffer)
         }
+    
+        guard let blockBuffer = sampleBuffer.dataBuffer else { return }
         
-        guard let dataBuffer = sampleBuffer.dataBuffer else { return }
-        
-        var totalLength: Int = 0
-        var dataPointer: UnsafeMutablePointer<Int8>?
-        
-        let error = CMBlockBufferGetDataPointer(
-            dataBuffer,
-            atOffset: 0,
-            lengthAtOffsetOut: nil,
-            totalLengthOut: &totalLength,
-            dataPointerOut: &dataPointer
-        )
-        
-        guard error == kCMBlockBufferNoErr, let dataPointer = dataPointer else { return }
-        var packageStartIndex = 0
-            
-        // dataPointer has several NAL units which respectively is
-        // composed of 4 bytes data represents NALU length and pure NAL unit.
-        // To reduce confusion, i call it a package which represents (4 bytes NALU length + NAL Unit)
-        while packageStartIndex < totalLength {
-            var nextNALULength: UInt32 = 0
-            memcpy(&nextNALULength, dataPointer.advanced(by: packageStartIndex), 4)
-            // First four bytes of package represents NAL unit's length in Big Endian.
-            // We should convert Big Endian Representation to Little Endian becasue
-            // nextNALULength variable here should be representation of human readable number.
-            nextNALULength = CFSwapInt32BigToHost(nextNALULength)
-            
-            var nalu = Data(bytes: dataPointer.advanced(by: packageStartIndex+4), count: Int(nextNALULength))
-            
-            packageStartIndex += (4 + Int(nextNALULength))
-            
-            encoder.naluHandler?(VideoEncoder.naluStartCode + nalu)
-        }
-        
-        print("Recived data")
-        
+        encoder.extractDataFromCMBlockBuffer(bbuf: blockBuffer)
     }
     
     func configureCompressionSession() {
-        let width = Int32(720)
-        let height = Int32(1280)
+        let width = Int32(1280)
+        let height = Int32(720)
         
         let error = VTCompressionSessionCreate(
             allocator: kCFAllocatorDefault,

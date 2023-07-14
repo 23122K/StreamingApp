@@ -8,30 +8,14 @@
 import SwiftUI
 
 struct ContentView: View {
-    
-    //For testing purposes only
-    let videoEncoder = VideoEncoder()
-    let tcpClient = TCPClient()
-    
-    func connect(to ipAddress: String, with port: UInt16) {
-        tcpClient.connect(to: ipAddress, with: port)
-    }
-    
-    func startStreaming() {
-        print(#function)
-        videoEncoder.configureCompressionSession()
-        CameraManager.shared.setVideoDataOutputDelegate(with: videoEncoder)
-        videoEncoder.naluHandler = { data in
-            self.tcpClient.send(data: data)
-        }
-    }
-    
+    let client = Client()
     var body: some View {
         ZStack{
             CameraPreview(cameraManager: CameraManager.shared)
             VStack{
+                Spacer()
                 Button(action: {
-                    startStreaming()
+                    client.startStreaming()
                 }, label: {
                     Text("Start")
                         .foregroundColor(.white)
@@ -41,7 +25,7 @@ struct ContentView: View {
             }
         }
         .onAppear{
-            connect(to: "172.20.10.13", with: 8080)
+            client.connect(to: "172.20.10.13", with: 8080)
         }
     }
 }
