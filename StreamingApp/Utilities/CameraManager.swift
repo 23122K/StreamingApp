@@ -49,7 +49,9 @@ public final class CameraManager {
             
             addOutputToCaptureSession(output: videoDataOutput)
             
-            captureSession.sessionPreset = .hd1920x1080
+            captureSession.connections[1].videoOrientation = .portrait
+            captureSession.connections[1].isVideoMirrored = false
+            
             captureSession.commitConfiguration()
             
             startCaptureSession()

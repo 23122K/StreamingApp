@@ -163,8 +163,8 @@ class VideoEncoder: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     }
     
     func configureCompressionSession() {
-        let width = Int32(1280)
-        let height = Int32(720)
+        let width = Int32(562)
+        let height = Int32(1218)
         
         let error = VTCompressionSessionCreate(
             allocator: kCFAllocatorDefault,

@@ -14,16 +14,31 @@ protocol VideoDecoderOutputDelegate {
 
 /// Abstract: Object recives data comosed of NAL Units and converts them Into H264Format
 class VideoDecoder {
-    func convertNALUToH264Unit(_ NALU: Data) -> (H264Data: Data, H264Header: Data?) {
+    enum NALUTypeClass {
+        case VCL
+        case SPS
+        case PPS
+    }
+    
+    
+    var PPS: Data?
+    var SPS: Data?
+    
+    //https://stackoverflow.com/questions/25078364/cmvideoformatdescriptioncreatefromh264parametersets-issues
+    func convertNALUToH264Unit(_ NALU: Data) -> (data: Data, NALUType: NALUTypeClass) {
         let category = NALU[0] & 0x1F
         
         switch category {
-        case 1...5: //When NAL Unit category is VCL
+        case 7:
+            return (NALU, .SPS)
+        case 8: //When NAL Unit category is non-VCL we do not return size aka length values
+            print(category)
+            return (NALU, .PPS)
+        default: //When NAL Unit category is VCL
             var NALULength = CFSwapInt32HostToBig(UInt32(NALU.count))
+            let NALULengthData = Data(bytes: &NALULength, count: NALUHeaderSize)
             
-            return (NALU, Data(bytes: &NALULength, count: 4))
-        default: //When NAL Unit category is non-VCL
-            return (NALU, nil)
+            return (NALULengthData + NALU, .VCL)
         }
     }
     
@@ -35,16 +50,29 @@ class VideoDecoder {
     private var bufferIndex: Int = 0
     private var videoFormatDescription: CMVideoFormatDescription?
     
-    private func createDescription(with H264Data: Data) {
-    
-        let spsPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: H264Data.count)
-        H264Data.copyBytes(to: spsPtr, count: H264Data.count)
+    private func createDescription(with H264Data: Data, naluType: NALUTypeClass) {
+        if naluType == .PPS {
+            PPS = H264Data
+            print("MY PPS SET")
+        }
+        else if naluType == .SPS {
+            SPS = H264Data
+            print("MY SPS SET")
+        }
         
-        let ppsPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: H264Data.count)
-        H264Data.copyBytes(to: ppsPtr, count: H264Data.count)
+        guard let PPS = PPS, let SPS = SPS else { return }
+        
+        print("MY SPS \(SPS) MY PPS \(PPS)")
+    
+        print("My data is - \(H264Data)")
+        let spsPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: SPS.count)
+        SPS.copyBytes(to: spsPtr, count: SPS.count)
+        
+        let ppsPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: PPS.count)
+        PPS.copyBytes(to: ppsPtr, count: PPS.count)
                 
         let parameterSet = [UnsafePointer(spsPtr), UnsafePointer(ppsPtr)]
-        let parameterSetSizes = [H264Data.count, H264Data.count]
+        let parameterSetSizes = [SPS.count, PPS.count]
         
         defer {
             parameterSet.forEach {
@@ -60,6 +88,7 @@ class VideoDecoder {
             nalUnitHeaderLength: 4,
             formatDescriptionOut: &videoFormatDescription
         )
+        
         
     }
     
@@ -125,22 +154,29 @@ class VideoDecoder {
         decodingQueue.async { [unowned self] in
             dataBuffer.append(data)
             
-            while bufferIndex < (dataBuffer.endIndex - NALUHeaderSize) {
+            while bufferIndex < (dataBuffer.endIndex - 3) {
                 //Using an OR oprater to check if data buffer cantains Nalu start code
                 if dataBuffer[bufferIndex] | dataBuffer[bufferIndex + 1] | dataBuffer[bufferIndex + 2] | dataBuffer[bufferIndex + 3] == 1 {
                     if bufferIndex != 0 {
                         let H264Unit = convertNALUToH264Unit(Data(dataBuffer[0..<bufferIndex]))
+                        print("------ My H264Unit ------")
                         //IF H264 unit was created from nonVCL (SPS, PPS, etc.) we must create description for it
-                        if H264Unit.H264Header == nil { createDescription(with: H264Unit.H264Data) }
-                        
-                        if let blockBuffer = createBlockBuffer(with: H264Unit.H264Data), let sampleBuffer = createSampleBuffer(bbuf: blockBuffer) {
-                            decodedDataDelegate?.decodedOutput(sampleBuffer)
+                        switch H264Unit.NALUType {
+                        case .VCL:
+                            if let blockBuffer = createBlockBuffer(with: H264Unit.data), let sampleBuffer = createSampleBuffer(bbuf: blockBuffer) {
+                                decodedDataDelegate?.decodedOutput(sampleBuffer)
+                            }
+                            print("VCL")
+                        case .SPS, .PPS:
+                            videoFormatDescription = nil
+                            createDescription(with: H264Unit.data, naluType: H264Unit.NALUType)
+                            print(videoFormatDescription ?? "NIL")
                         }
                     }
                     
-                    dataBuffer.removeSubrange(0..<bufferIndex + 3)
+                    dataBuffer.removeSubrange(0...bufferIndex + 3)
                     bufferIndex = 0
-                } else {
+                } else { // dataStream[searchIndex+3] == 0
                     bufferIndex += 1
                 }
             }
@@ -148,3 +184,4 @@ class VideoDecoder {
     }
     
 }
+
