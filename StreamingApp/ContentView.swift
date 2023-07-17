@@ -12,20 +12,24 @@ struct ContentView: View {
     var body: some View {
         ZStack{
             CameraPreview(cameraManager: CameraManager.shared)
+                .cornerRadius(25)
             VStack{
                 Spacer()
-                Button(action: {
-                    client.startStreaming()
-                }, label: {
-                    Text("Start")
-                        .foregroundColor(.white)
-                        .font(.title)
-                        .fontWeight(.semibold)
-                })
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        client.connect(to: "172.20.10.13", with: 8080)
+                        client.startStreaming()
+                    }, label: {
+                        Image(systemName: "video")
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(.ultraThinMaterial)
+                            .cornerRadius(30)
+                    })
+                }
+                .padding()
             }
-        }
-        .onAppear{
-            client.connect(to: "172.20.10.13", with: 8080)
         }
     }
 }

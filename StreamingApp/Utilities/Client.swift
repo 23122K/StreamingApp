@@ -21,10 +21,10 @@ class Client: VideoEncoderOutputDelegate {
     }
     
     func startStreaming() {
-        print(#function)
-        videoEncoder.configureCompressionSession()
-        CameraManager.shared.setVideoDataOutputDelegate(with: videoEncoder)
-        videoEncoder.encodedDataDelegate = self
-        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: { [self] in
+            videoEncoder.configureCompressionSession()
+            CameraManager.shared.setVideoDataOutputDelegate(with: videoEncoder)
+            videoEncoder.encodedDataDelegate = self
+        })
     }
 }
